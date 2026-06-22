@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>2026 京阪奈盛夏自由行神級手冊</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{ --safe-bottom: env(safe-area-inset-bottom,0px); }
+    *{ box-sizing:border-box; }
+    html{ scroll-behavior:smooth; }
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Microsoft JhengHei",sans-serif;
+      background:linear-gradient(180deg,#f8fafc 0%,#eef6ff 45%,#f8fafc 100%);
+      color:#0f172a;
+      -webkit-tap-highlight-color:transparent;
+      overscroll-behavior-y:contain;
+    }
+    button,a{ touch-action:manipulation; }
+    .app-shell{ max-width:480px; margin:0 auto; min-height:100vh; background:#fff; box-shadow:0 24px 70px rgba(15,23,42,.12); position:relative; overflow:hidden; }
+    .soft-glass{ background:rgba(255,255,255,.88); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+    .no-scrollbar::-webkit-scrollbar{ display:none; }
+    .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
+    .tab-safe{ padding-bottom:calc(14px + var(--safe-bottom)); }
+    .card-shadow{ box-shadow:0 10px 30px rgba(15,23,42,.06); }
+    .tap{ transition:transform .12s ease, opacity .12s ease, background-color .12s ease; }
+    .tap:active{ transform:scale(.97); opacity:.88; }
+    .line-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .weather-skeleton{ background:linear-gradient(90deg,#f1f5f9,#e2e8f0,#f1f5f9); background-size:200% 100%; animation:pulse 1.2s infinite; }
+    @keyframes pulse{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    @media print{
+      body{ background:white!important; }
+      .no-print, nav, header, #bottom-nav, #toast, .modal-backdrop{ display:none!important; }
+      .app-shell{ box-shadow:none; max-width:none; overflow:visible; }
+      main{ padding:0!important; }
+      #print-area{ display:block!important; }
+      .print-card{ break-inside:avoid; page-break-inside:avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="soft-glass sticky top-0 z-40 border-b border-slate-100">
+      <div class="px-4 pt-4 pb-3">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-[11px] font-black tracking-[.18em] text-sky-600">KANSAI 2026</p>
+            <h1 class="mt-1 text-lg leading-tight font-black text-slate-950">京阪奈盛夏自由行手冊</h1>
+            <p class="mt-1 text-[11px] text-slate-500">大阪・京都・奈良｜手機現場版</p>
+          </div>
+          <button onclick="refreshWeather(true)" class="tap shrink-0 rounded-2xl bg-slate-900 px-3 py-2 text-[11px] font-black text-white shadow-lg shadow-slate-900/10">↻ 天氣</button>
+        </div>
+
+        <section class="mt-3 rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-3 card-shadow">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div>
+              <p class="text-[12px] font-black text-slate-900">日本氣象資訊</p>
+              <p class="text-[10px] text-slate-500">即時體感、今日／明日高低溫與降雨機率</p>
+            </div>
+            <span id="weather-updated" class="text-[10px] font-bold text-slate-400">讀取中</span>
+          </div>
+          <div id="weather-grid" class="grid grid-cols-3 gap-2"></div>
+          <div class="mt-2 grid grid-cols-3 gap-2 no-print">
+            <button onclick="openWeatherDetail('osaka')" class="tap rounded-2xl border border-sky-100 bg-white px-2 py-2 text-center text-[10px] font-black text-sky-700 shadow-sm">Open‑Meteo<br>大阪詳情</button>
+            <button onclick="openWeatherDetail('kyoto')" class="tap rounded-2xl border border-sky-100 bg-white px-2 py-2 text-center text-[10px] font-black text-sky-700 shadow-sm">Open‑Meteo<br>京都詳情</button>
+            <button onclick="openWeatherDetail('nara')" class="tap rounded-2xl border border-sky-100 bg-white px-2 py-2 text-center text-[10px] font-black text-sky-700 shadow-sm">Open‑Meteo<br>奈良詳情</button>
+          </div>
+          <p class="mt-2 text-[10px] leading-relaxed text-slate-400">資料來源：Open-Meteo。上方按鈕會直接顯示該城市的可讀式天氣詳情，不會跳出原始 JSON；出門前再刷新一次，夏天午後雷雨像老闆臨時交辦，早知道早閃。</p>
+        </section>
+      </div>
+
+      <div class="px-4 pb-3">
+        <div id="day-tabs" class="flex gap-2 overflow-x-auto no-scrollbar snap-x"></div>
+      </div>
+    </header>
+
+    <main class="px-4 pt-4 pb-28">
+      <section id="itinerary-view">
+        <div class="grid grid-cols-2 gap-3 no-print">
+          <button onclick="printCurrentDay()" class="tap rounded-2xl bg-emerald-600 px-4 py-3 text-xs font-black text-white shadow-lg shadow-emerald-500/15">📄 列印／存 PDF</button>
+          <button onclick="shareTextItinerary()" class="tap rounded-2xl bg-slate-900 px-4 py-3 text-xs font-black text-white shadow-lg shadow-slate-900/15">🔗 複製 LINE 文字</button>
+        </div>
+
+        <div id="day-hero" class="mt-4 rounded-3xl bg-slate-950 p-4 text-white card-shadow"></div>
+        <div id="timeline" class="relative ml-3 mt-5 border-l-2 border-slate-100 space-y-5 pb-2"></div>
+      </section>
+
+      <section id="packing-view" class="hidden"></section>
+      <section id="ticket-view" class="hidden"></section>
+      <section id="hotel-view" class="hidden"></section>
+    </main>
+
+    <nav id="bottom-nav" class="soft-glass fixed bottom-0 left-1/2 z-40 grid w-full max-w-[480px] -translate-x-1/2 grid-cols-4 border-t border-slate-100 px-2 pt-2 tab-safe shadow-[0_-18px_40px_rgba(15,23,42,.08)]">
+      <button onclick="switchMainTab('itinerary')" id="nav-itinerary" class="tap rounded-2xl py-2 text-[10px] font-black text-sky-600"><span class="block text-xl">🗓️</span>行程</button>
+      <button onclick="switchMainTab('packing')" id="nav-packing" class="tap rounded-2xl py-2 text-[10px] font-black text-slate-400"><span class="block text-xl">🎒</span>打包</button>
+      <button onclick="switchMainTab('ticket')" id="nav-ticket" class="tap rounded-2xl py-2 text-[10px] font-black text-slate-400"><span class="block text-xl">🎫</span>周遊券</button>
+      <button onclick="switchMainTab('hotel')" id="nav-hotel" class="tap rounded-2xl py-2 text-[10px] font-black text-slate-400"><span class="block text-xl">🏡</span>民宿</button>
+    </nav>
+  </div>
+
+  <div id="modal" class="modal-backdrop hidden fixed inset-0 z-50 items-end justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:items-center">
+    <div class="w-full max-w-md rounded-[28px] bg-white p-5 shadow-2xl">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-[10px] font-black text-rose-600">給司機／路人看的大字卡</p>
+          <h3 id="modal-name" class="mt-1 text-sm font-black text-slate-900"></h3>
+        </div>
+        <button onclick="closeModal()" class="tap rounded-full bg-slate-100 px-3 py-2 text-xs font-black text-slate-500">✕</button>
+      </div>
+      <div class="my-4 rounded-3xl bg-slate-950 p-5 text-center text-white">
+        <p id="modal-address" class="select-all break-words font-mono text-2xl font-black leading-normal"></p>
+      </div>
+      <p id="modal-note" class="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600"></p>
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <button onclick="copyModalAddress()" class="tap rounded-2xl bg-slate-100 py-3 text-xs font-black text-slate-700">📋 複製地址</button>
+        <a id="modal-map" target="_blank" rel="noopener noreferrer" class="tap rounded-2xl bg-sky-600 py-3 text-center text-xs font-black text-white">🗺️ 開地圖</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="weather-detail-modal" class="modal-backdrop hidden fixed inset-0 z-50 items-end justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:items-center">
+    <div class="w-full max-w-md rounded-[28px] bg-white p-5 shadow-2xl">
+      <div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+        <div>
+          <p class="text-[10px] font-black tracking-[.14em] text-sky-600">OPEN‑METEO WEATHER</p>
+          <h3 id="weather-detail-title" class="mt-1 text-base font-black text-slate-900">天氣詳情</h3>
+          <p id="weather-detail-subtitle" class="mt-1 text-[11px] text-slate-500">大阪・京都・奈良</p>
+        </div>
+        <button onclick="closeWeatherDetail()" class="tap rounded-full bg-slate-100 px-3 py-2 text-xs font-black text-slate-500">✕</button>
+      </div>
+      <div id="weather-detail-body" class="mt-4 space-y-3 text-sm"></div>
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <button onclick="refreshWeather(true); closeWeatherDetail();" class="tap rounded-2xl bg-sky-600 py-3 text-xs font-black text-white">↻ 更新天氣</button>
+        <button onclick="closeWeatherDetail()" class="tap rounded-2xl bg-slate-900 py-3 text-xs font-black text-white">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-slate-950/90 px-4 py-2.5 text-[11px] font-black text-white opacity-0 shadow-xl transition-opacity">完成</div>
+
+  <script>
+const travelData = {
+
+    1: {
+
+        title: "Day 1 (7/1 三) ｜ 落地臨空城閃電血拼 × 難波露營聖地與 Luck:Rack 巡禮",
+
+        clothing: "🔥 盛夏熱浪警告：體感恐達35°C。建議穿著純白 AIRism T恤（涼感舒適）及透氣短褲，第一天現買現穿！",
+
+        items: [
+
+            { time: "12:00", name: "關西國際機場抵達", type: "flight", addr: "〒549-0001 大阪府泉佐野市泉州空港北1", note: "搭乘星宇航空 JX820 (08:30 桃園起飛)。出關後快速領取行李、領取網卡，並去臨櫃購買 ICOCA。" },
+
+            { time: "13:10", name: "Rinku Premium Outlets 臨空城", type: "shop", addr: "〒598-8508 大阪府泉佐野市りんくう往來南3-28", note: "⚡ 限制 1.5 小時極速閃擊！大行李箱建議鎖在臨空城站內置物櫃，若客滿可拉至 Outlet 服務中心提供人工行李寄放服務。" },
+
+            { time: "15:35", name: "民宿 JS暁宅・靜谷 Check-in", type: "hotel", addr: "〒557-0031 大阪府大阪市西成区鶴見橋1-15-21", note: "搭乘南海電鐵至天下茶屋站，轉乘地下鐵四橋線1站至花園町站，出站走5分鐘即達。先回房吹冷氣、洗臉補水休息。" },
+
+            { time: "17:30", name: "難波 Parks & Luck:Rack 購衣", type: "shop", addr: "〒556-0011 大阪府大阪市浪速区難波中2丁目10-70", note: "朝聖 Alpen Outdoors 露營旗艦店看焚火裝備。同棟 T-terrace 4樓有名牌折扣店 Luck:Rack，可用3-8折狂收潮流神服！" },
+
+            { time: "19:00", name: "道頓堀與心齋橋商圈晚餐", type: "food", addr: "〒542-0071 大阪府大阪市中央区道頓堀1丁目", note: "與必拍的跑跑人地標拍照合影，晚餐推薦一蘭拉麵、金龍拉麵或章魚燒街頭小吃。" },
+
+            { time: "21:30", name: "🏠 順暢返回民宿大本營", type: "home", addr: "〒557-0031 大阪府大阪市西成区鶴見橋1-15-21", note: "由【難波站】搭乘地下鐵四橋線往住之江公園方向 ➔ 2站直達【花園町站】。由2號出口出站，走鶴見橋大馬路平坦商店街5分鐘回民宿，刷 ICOCA 扣款 ¥190。" }
+
+        ]
+
+    },
+
+    2: {
+
+        title: "Day 2 (7/2 四) ｜ 大阪周遊券黃金回本路線 × 落日遊船夢幻航班",
+
+        clothing: "🕶️ 戶外極致暴曬提醒：全日周遊券景點制霸。推薦著防曬長袖輕薄外衫，備妥手持風扇，定時補水防止中暑。",
+
+        items: [
+
+            { time: "08:50", name: "大阪城港碼頭 🎫 搶先換票", type: "ticket", addr: "〒540-0002 大阪府大阪市中央区大阪城2", note: "一抵達先去窗口出示電子周遊券 QR 碼！不要排 10:30 班次，直接兌換當天最早有空位的 Aqua-Liner 水上巴士船票，最安全！" },
+
+            { time: "09:10", name: "大阪城天守閣", type: "scene", addr: "〒540-0002 大阪府大阪市中央区大阪城1-1", note: "免排隊買票，直接去檢票口掃電子周遊券 QR 碼登頂，避開大批旅行團。" },
+
+            { time: "10:30", name: "Aqua-Liner 水上巴士體驗", type: "ship", addr: "〒540-0002 大阪府大阪市中央区大阪城2", note: "船艙內冷氣超強。原汁原味坐在舒適沙發上遊覽大川運河，完美避開上午烈日暴曬（價值¥1,800，周遊券免費）。" },
+
+            { time: "13:00", name: "梅田藍天大廈 空中庭園展望台", type: "scene", addr: "〒531-6039 大阪府大阪市北区大淀中1丁目1-88", note: "💡 防坑關鍵：從東梅田站走葛蘭綠地（Grand Green Osaka）平面無障礙綠色公園廊道至此，步行約15分鐘，確保15:00免費截止前刷進場。" },
+
+            { time: "14:00", name: "午餐：Tonkatsu KYK 豬排飯", type: "food", addr: "〒530-0017 大阪府大阪市北区角田町8-47（阪急32番街 28階）", note: "在高空俯瞰梅田一邊享用頂級黑豚里肌豬排 / 腰內肉豬排定食。" },
+
+            { time: "15:40", name: "🛳️ Wonder Cruise 碼頭提早報到", type: "ticket", addr: "〒542-0084 大阪府大阪市中央区宗右衛門町", note: "⚠️ 官方嚴格規定：已線上成功預訂 16:10 班次，必須提前 30 分鐘抵達日本橋碼頭窗口出示憑證與周遊券換取實體船票！" },
+
+            { time: "16:10", name: "Wonder Cruise 道頓堀遊船", type: "ship", addr: "〒542-0084 大阪府大阪市中央区宗右衛門町", note: "落日黃金航班（航程20分鐘）！夕陽微斜，在河面上迎著風與霓虹跑跑人正面合照，效果無可挑剔（周遊券免費）。" },
+
+            { time: "18:00", name: "通天閣登頂 & 新世界串炸晚餐", type: "food", addr: "〒556-0002 大阪府大阪市浪速区恵美須東1丁目18-6", note: "通天閣地下一樓出示周遊券（平日免費玩溜滑梯）。晚餐去「串かつだるま 新世界總本店」體驗正宗大阪串炸。" },
+
+            { time: "20:30", name: "🏠 順暢返回民宿大本營", type: "home", addr: "〒557-0031 大阪府大阪市西成区鶴見橋1-15-21", note: "【動物園前站】搭地鐵御堂筋線 ➔ 1站至【大國町站】，下車走到對面月台（3秒平行轉乘，免爬樓梯！）➔ 1站到【花園町站】。持電子周遊券全程免費搭乘。" }
+
+        ]
+
+    },
+
+    3: {
+
+        title: "Day 3 (7/3 五) ｜ 京都古都暴走一日遊 × 計程車省力救命流",
+
+        clothing: "👟 骨牌級體能考驗：步數必破 20,000 步！清水寺至二年坂皆為上下斜坡。請穿上最強慢跑鞋，備妥防曬遮陽傘。",
+
+        items: [
+
+            { time: "07:30", name: "大阪出發：大國町平行轉乘大法", type: "metro", addr: "〒556-0015 大阪府大阪市浪速区敷津東3丁目11", note: "花園町站上車，在大國町站走到對面月台直接轉御堂筋線，直達淀屋橋站換乘「京阪電車」特急殺往京都，省去梅田迷宮迷路時間。" },
+
+            { time: "08:50", name: "搭計程車直達 📍 清水寺觀光停車場", type: "taxi", addr: "〒605-0862 京都市東山区清水1丁目（清水寺観光駐車場）", note: "💡 救命神招：於京阪電車「祇園四條站」出站直接全團共乘計程車。請司機送您到最高極限的「觀光停車場」，下車走2分鐘直達仁王門售票處，完全跳過 1.5 公里純上坡斜坡，保留腳力！" },
+
+            { time: "09:00", name: "清水寺本堂參拜", type: "scene", addr: "〒605-0862 京都府京都市東山区清水1丁目294", note: "清晨古寺人潮較少。漫步清水舞台，驚嘆木造懸空古建築之美。" },
+
+            { time: "10:30", name: "三年坂、二年坂 & 八坂神社", type: "scene", addr: "〒605-0073 京都府京都市東山区祇園町北側625", note: "順山坡而下逛京都老街小吃，並順路加入就在旁邊的「八坂神社」拍照打卡，不增加額外交通成本。" },
+
+            { time: "11:30", name: "祇園風味午餐與町家咖啡店", type: "food", addr: "〒605-0074 京都府京都市東山区祇園町南側", note: "中午安排走入京都町家咖啡廳，徹底吹冷氣高強度散熱，讓雙腳休息充血，防範盛夏中暑。" },
+
+            { time: "14:30", name: "鴨川漫步吹河風", type: "scene", addr: "〒605-0000 京都府京都市東山区大和大路通", note: "午後漫步鴨川畔，感受極具和風的愜意京都，隨後至祇園四條搭京阪電車返回大阪。" },
+
+            { time: "17:30", name: "🏠 返回民宿大本營", type: "home", addr: "〒557-0031 大阪府大阪市西成区鶴見橋1-15-21", note: "從京都搭京阪電車回大阪【淀屋橋站】，轉乘地鐵御堂筋線 ➔ 坐到【大國町站】，平行走到對面轉四橋線 ➔ 1站到【花園町站】。" }
+
+        ]
+
+    },
+
+    4: {
+
+        title: "Day 4 (7/4 六) ｜ 奈良小鹿與木造大佛療癒一日遊",
+
+        clothing: "🦌 小鹿防蹭防泥污提醒：推薦著大地色系、好洗不怕髒的機能服飾（防小鹿口水），並穿著防滑跑鞋，避免踩到鹿便便。",
+
+        items: [
+
+            { time: "09:00", name: "出發：難波直達近鐵奈良", type: "metro", addr: "〒542-0076 大阪府大阪市中央区難波4丁目1-17", note: "從花園町坐地鐵到難波，轉乘「近鐵奈良線」快速急行，一線直達近鐵奈良站，離景點最近、最省力。" },
+
+            { time: "10:00", name: "奈良公園餵鹿體驗", type: "scene", addr: "〒630-8211 奈良県奈良市雑司町", note: "購買鹿仙貝（¥200），享受被貪吃小鹿包圍的特殊樂趣。注意不要將仙貝高舉逗鹿，以防被鹿頂撞。" },
+
+            { time: "11:10", name: "東大寺大佛殿", type: "scene", addr: "〒630-8211 奈良県奈良市雑司町406-1", note: "參拜世界最大的木造古建築，以及宏偉無比的盧舍那大佛。" },
+
+            { time: "12:30", name: "奈良在地午餐 (志津香釜飯/大佛布丁)", type: "food", addr: "〒630-8213 奈良県奈良市東向中町29", note: "近鐵站周邊品嚐極具特色的釜飯，並在東向商店街大口品嚐香濃的大佛布丁。" },
+
+            { time: "13:30", name: "春日大社常夜燈參道", type: "scene", addr: "〒630-8212 奈良県奈良市春日野町160", note: "漫步在長滿青苔的常夜燈石板參道上，感受原始森林環抱的神秘莊嚴氣氛。" },
+
+            { time: "14:30", name: "中谷堂搗麻糬秀 & 奈良町老街", type: "food", addr: "〒630-8218 奈良県奈良市橋本町29", note: "順路前往中谷堂觀看極速高速搗麻糬表演，買一顆熱騰騰的艾草紅豆麻糬，隨後漫步江戶風情奈良町古街。" },
+
+            { time: "17:00", name: "🏠 返回民宿大本營", type: "home", addr: "〒557-0031 大阪府大阪市西成区鶴見橋1-15-21", note: "【近鐵奈良站】搭近鐵奈良線回【大阪難波站】，轉地鐵四橋線 ➔ 2站直回【花園町站】。2號出口走回「靜谷」民宿。刷 ICOCA 扣近鐵 ¥680 + 地鐵 ¥190。" }
+
+        ]
+
+    },
+
+    5: {
+
+        title: "Day 5 (7/5 日) ｜ 周遊券二回目超神回本 × 堺筋中央線交通滿分",
+
+        clothing: "🛳️ 港灣防海風提醒：上午為全室內與小吃。下午聖瑪麗亞號航行海面，建議備好遮陽帽與太陽眼鏡，防止波光反射刺眼。",
+
+        items: [
+
+            { time: "09:00", name: "大阪生活今昔館", type: "scene", addr: "〒530-0041 大阪府大阪市北区天神橋6丁目4-20", note: "一線直達！從天下茶屋站搭地鐵堺筋線13分鐘直達終點天神橋筋六丁目站。全室內冷氣超強（周遊券免費）。" },
+
+            { time: "10:30", name: "天神橋筋商店街藥妝血拼", type: "shop", addr: "〒530-0041 大阪府大阪市北区天神橋", note: "全日本最長商店街，此處的藥妝與道地小吃價格是全大阪極致便宜的激戰區！" },
+
+            { time: "11:30", name: "午餐：春駒壽司或鰻魚飯", type: "food", addr: "〒530-0041 大阪府大阪市北神橋5丁目5-2", note: "在商店街內享用排隊名店「春駒壽司」超厚切生魚片，或名代宇奈toto超平價炭火鰻魚飯。" },
+
+            { time: "12:40", name: "前往大阪港：神級轉乘走法", type: "metro", addr: "〒541-0054 大阪府大阪市中央区南本町2丁目", note: "🚇 交通滿分：從天六搭堺筋線至【堺筋本町站】，下車走到對面月台「平行轉乘中央線」直達【大阪港站】。只換車一次，最省力！" },
+
+            { time: "13:10", name: "🚢 聖瑪麗亞號先換票", type: "ticket", addr: "〒552-0022 大阪府大阪市港区海岸通1丁目1-10", note: "一抵達大阪港碼頭，立刻出示電子周遊券 QR 碼換取「15:00 班次」船票。確保黃金位子到手！" },
+
+            { time: "13:20", name: "天保山大摩天輪", type: "scene", addr: "〒552-0022 大阪府大阪市港区海岸通1丁目1-10", note: "刷電子周遊券免費搭乘（價值¥900）。建議選擇「全透明全景車廂」，高空俯瞰整個大阪港與明石海峽大橋。" },
+
+            { time: "15:00", name: "帆船型觀光船 聖瑪麗亞號", type: "ship", addr: "〒552-0022 大阪府大阪市港区海岸通1丁目1-10", note: "以哥倫布帆船按比例仿製。航程45分鐘，可坐在豪華沙龍冷氣艙內隔著玻璃看港灣，或登甲板迎海風巡航（周遊券免費）。" },
+
+            { time: "17:00", name: "新世界商圈元祖串炸晚餐", type: "food", addr: "〒556-0002 大阪府大阪市浪速区恵美須東", note: "從大阪港搭中央線至本町，轉御堂筋線至動物園前站。晚餐在新世界大吃熱騰騰的串炸與生啤酒。" },
+
+            { time: "19:30", name: "🏠 返回民宿大本營", type: "home", addr: "〒557-0031 大阪府大阪市西成区鶴見橋1-15-21", note: "【動物園前站】地鐵御堂筋線 ➔ 1站至【大國町站】，平行走到對面轉四橋線 ➔ 1站抵達【花園町站】。2號出口走回「靜谷」民宿。" }
+
+        ]
+
+    },
+
+    6: {
+
+        title: "Day 6 (7/6 一) ｜ 空手開運朝聖 × 木津市場海鮮大餐 × 完美回程",
+
+        clothing: "✈️ 開運收尾穿搭：今日完全不拖行李逛街！穿上最寬鬆舒適的服飾與最輕便的鞋子，準備搭星宇航空完美返台。",
+
+        items: [
+
+            { time: "08:30", name: "輕裝空手出門 ⛩️ 難波八阪神社", type: "scene", addr: "〒556-0016 大阪府大阪市浪速区難波中2丁目9-19", note: "💡 超省力神動線：大行李安心鎖在民宿房間內（先不要搬）。空着雙手搭地鐵1站至大國町站，走路7分鐘拜訪12公尺巨型巨獅子殿，開運吞噬厄運！" },
+
+            { time: "09:30", name: "木津市場 🍣 大阪廚房極致早餐", type: "food", addr: "〒556-0012 大阪府大阪市浪速区敷津東2丁目2-8", note: "從神社散步過去。在在地人最愛的木津批發市場「魚市食堂」品餚海鮮丼、現剖海膽，或吃三輪壽司、烤鰻魚。" },
+
+            { time: "10:30", name: "返回民宿最後打包行李", type: "hotel", addr: "〒557-0031 大阪府大阪市西成区鶴見橋1-15-21", note: "搭地鐵1站折返民宿，進行戰利品、衣服最終壓縮塞入行李箱，化妝休整。" },
+
+            { time: "11:00", name: "準時 Check-out 鎖門退房", type: "metro", addr: "〒557-0014 大阪府大阪市西成区天下茶屋3丁目", note: "拉著箱子沿著鶴見橋平坦、全覆蓋有雨棚的商店街悠閒步行10分鐘，直達【天下茶屋站】。完全不曬太陽、不走碎石路！" },
+
+            { time: "11:24", name: "天下茶屋站 🚇 南海電鐵直飛機場", type: "flight", addr: "〒557-0014 大阪府大阪市西成区天下茶屋3丁目", note: "搭乘南海線「空港急行」一線直達關西機場。天下茶屋雖是中途站，但11:24班次空位極多，大家100%可以優雅入座放好隨身手提件。" },
+
+            { time: "12:06", name: "抵達關西國際機場", type: "flight", addr: "〒549-0001 大阪府泉佐野市泉州空港北1", note: "穩穩提早3小時到達機場大廳，從容辦理星宇航空 JX823 託運（15:10起飛），最後去機場免稅店橫掃伴手禮（白色戀人、ROYCE）。" }
+
+        ]
+
+    }
+
+};
+
+    const cities = [
+      { key:'osaka', name:'大阪', lat:34.6937, lon:135.5023 },
+      { key:'kyoto', name:'京都', lat:35.0116, lon:135.7681 },
+      { key:'nara', name:'奈良', lat:34.6851, lon:135.8048 }
+    ];
+    const weatherText = {
+      0:'晴',1:'多雲',2:'多雲',3:'陰',45:'霧',48:'霧',51:'毛雨',53:'毛雨',55:'毛雨',61:'小雨',63:'雨',65:'大雨',66:'凍雨',67:'凍雨',71:'雪',73:'雪',75:'大雪',80:'陣雨',81:'陣雨',82:'強陣雨',95:'雷雨',96:'雷雨',99:'雷雨'
+    };
+    const weatherIcon = code => code === 0 ? '☀️' : [1,2].includes(code) ? '🌤️' : code === 3 ? '☁️' : [45,48].includes(code) ? '🌫️' : [95,96,99].includes(code) ? '⛈️' : code >= 51 && code <= 82 ? '🌧️' : code >= 71 && code <= 75 ? '❄️' : '🌡️';
+
+    let currentDay = 1;
+    let activeMainTab = 'itinerary';
+    let modalPayload = { address:'' };
+    let weatherCache = {};
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderDayTabs();
+      renderStaticPanels();
+      switchDay(1);
+      refreshWeather(false);
+    });
+
+    function renderDayTabs(){
+      const wrap = document.getElementById('day-tabs');
+      wrap.innerHTML = Object.keys(travelData).map(day => `
+        <button id="day-${day}" onclick="switchDay(${day})" class="tap snap-center shrink-0 rounded-2xl px-4 py-2.5 text-xs font-black bg-slate-100 text-slate-500">Day ${day}</button>
+      `).join('');
+    }
+
+    async function refreshWeather(manual){
+      const grid = document.getElementById('weather-grid');
+      grid.innerHTML = cities.map(c => `
+        <div class="rounded-2xl border border-slate-100 bg-white p-2 text-center">
+          <div class="weather-skeleton mx-auto mb-2 h-4 w-10 rounded-full"></div>
+          <div class="weather-skeleton h-3 rounded-full"></div>
+          <div class="weather-skeleton mt-1 h-3 rounded-full"></div>
+        </div>
+      `).join('');
+      try{
+        const results = await Promise.all(cities.map(async city => {
+          const url = weatherApiUrl(city);
+          const res = await fetch(url);
+          if(!res.ok) throw new Error('weather failed');
+          const data = await res.json();
+          return { city, data };
+        }));
+        weatherCache = Object.fromEntries(results.map(({city,data}) => [city.key, data]));
+        grid.innerHTML = results.map(({city,data}) => {
+          const cur = data.current || {};
+          const d = data.daily || {};
+          const code = cur.weather_code ?? d.weather_code?.[0] ?? 0;
+          return `
+            <article class="rounded-2xl border border-slate-100 bg-white p-2.5 text-center shadow-sm">
+              <div class="text-lg leading-none">${weatherIcon(code)}</div>
+              <div class="mt-1 text-[12px] font-black text-slate-900">${city.name}</div>
+              <div class="mt-1 text-[11px] font-black text-sky-700">${Math.round(cur.temperature_2m ?? 0)}°C</div>
+              <div class="text-[10px] text-slate-500">體感 ${Math.round(cur.apparent_temperature ?? cur.temperature_2m ?? 0)}°</div>
+              <div class="mt-1 rounded-xl bg-slate-50 px-1.5 py-1 text-[10px] leading-relaxed text-slate-600">
+                今 ${Math.round(d.temperature_2m_min?.[0] ?? 0)}-${Math.round(d.temperature_2m_max?.[0] ?? 0)}°｜雨${d.precipitation_probability_max?.[0] ?? '-'}%<br>
+                明 ${Math.round(d.temperature_2m_min?.[1] ?? 0)}-${Math.round(d.temperature_2m_max?.[1] ?? 0)}°｜雨${d.precipitation_probability_max?.[1] ?? '-'}%
+              </div>
+            </article>`;
+        }).join('');
+        document.getElementById('weather-updated').textContent = new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+        if(manual) showToast('天氣已更新');
+      }catch(err){
+        grid.innerHTML = cities.map(c => `
+          <a href="https://www.google.com/search?q=${encodeURIComponent(c.name+' 天氣 日本氣象')}" target="_blank" class="tap rounded-2xl border border-amber-100 bg-amber-50 p-2.5 text-center">
+            <div class="text-lg">🌦️</div><div class="text-[12px] font-black text-amber-900">${c.name}</div><div class="text-[10px] text-amber-700">天氣讀取失敗<br>點我查詢</div>
+          </a>
+        `).join('');
+        document.getElementById('weather-updated').textContent = '未連線';
+      }
+    }
+
+    function weatherApiUrl(city){
+      return `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=2`;
+    }
+
+    async function openWeatherDetail(key){
+      const city = cities.find(c => c.key === key);
+      if(!city) return;
+      const modal = document.getElementById('weather-detail-modal');
+      const body = document.getElementById('weather-detail-body');
+      document.getElementById('weather-detail-title').textContent = `${city.name}天氣詳情`;
+      document.getElementById('weather-detail-subtitle').textContent = '今日與明日｜Open‑Meteo 即時資料';
+      body.innerHTML = `<div class="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-center text-xs font-bold text-slate-500">讀取中…</div>`;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      try{
+        let data = weatherCache[key];
+        if(!data){
+          const res = await fetch(weatherApiUrl(city));
+          if(!res.ok) throw new Error('weather failed');
+          data = await res.json();
+          weatherCache[key] = data;
+        }
+        const cur = data.current || {};
+        const d = data.daily || {};
+        const code = cur.weather_code ?? d.weather_code?.[0] ?? 0;
+        const todayCode = d.weather_code?.[0] ?? code;
+        const tomorrowCode = d.weather_code?.[1] ?? todayCode;
+        body.innerHTML = `
+          <div class="rounded-3xl bg-slate-950 p-4 text-white">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-[11px] text-slate-300">目前天氣</p>
+                <p class="mt-1 text-2xl font-black">${weatherIcon(code)} ${Math.round(cur.temperature_2m ?? 0)}°C</p>
+              </div>
+              <div class="text-right text-[11px] leading-relaxed text-slate-300">
+                <p>體感 ${Math.round(cur.apparent_temperature ?? cur.temperature_2m ?? 0)}°C</p>
+                <p>濕度 ${cur.relative_humidity_2m ?? '-'}%</p>
+                <p>風速 ${cur.wind_speed_10m ?? '-'} km/h</p>
+              </div>
+            </div>
+            <p class="mt-3 rounded-2xl bg-white/10 p-3 text-xs leading-relaxed text-slate-100">${weatherText[code] || '天氣變化'}。夏天關西午後雷雨很會臨時加戲，出門前按一下「↻ 天氣」最保險。</p>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-3xl border border-sky-100 bg-sky-50 p-4">
+              <p class="text-[11px] font-black text-sky-700">今日</p>
+              <p class="mt-1 text-xl font-black text-slate-900">${weatherIcon(todayCode)} ${weatherText[todayCode] || '-'}</p>
+              <p class="mt-2 text-xs leading-relaxed text-slate-600">高溫 ${Math.round(d.temperature_2m_max?.[0] ?? 0)}°C<br>低溫 ${Math.round(d.temperature_2m_min?.[0] ?? 0)}°C<br>降雨 ${d.precipitation_probability_max?.[0] ?? '-'}%</p>
+            </div>
+            <div class="rounded-3xl border border-emerald-100 bg-emerald-50 p-4">
+              <p class="text-[11px] font-black text-emerald-700">明日</p>
+              <p class="mt-1 text-xl font-black text-slate-900">${weatherIcon(tomorrowCode)} ${weatherText[tomorrowCode] || '-'}</p>
+              <p class="mt-2 text-xs leading-relaxed text-slate-600">高溫 ${Math.round(d.temperature_2m_max?.[1] ?? 0)}°C<br>低溫 ${Math.round(d.temperature_2m_min?.[1] ?? 0)}°C<br>降雨 ${d.precipitation_probability_max?.[1] ?? '-'}%</p>
+            </div>
+          </div>
+          <p class="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500">資料由 Open‑Meteo API 即時讀取，已在本頁轉成可閱讀格式，不會再開啟一整排 JSON 原始碼。</p>
+        `;
+      }catch(e){
+        body.innerHTML = `<a href="https://www.google.com/search?q=${encodeURIComponent(city.name+' 天氣 日本')}" target="_blank" rel="noopener noreferrer" class="tap block rounded-2xl border border-amber-100 bg-amber-50 p-4 text-center text-xs font-black text-amber-800">Open‑Meteo 暫時讀取失敗<br>點我改用 Google 查詢 ${city.name} 天氣</a>`;
+      }
+    }
+
+    function closeWeatherDetail(){
+      const modal = document.getElementById('weather-detail-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function switchDay(day){
+      currentDay = day;
+      document.querySelectorAll('[id^="day-"]').forEach(btn => {
+        btn.className = 'tap snap-center shrink-0 rounded-2xl px-4 py-2.5 text-xs font-black bg-slate-100 text-slate-500';
+      });
+      const active = document.getElementById(`day-${day}`);
+      active.className = 'tap snap-center shrink-0 rounded-2xl px-4 py-2.5 text-xs font-black bg-sky-600 text-white shadow-lg shadow-sky-500/20';
+      switchMainTab('itinerary', false);
+      renderItinerary(day);
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    function switchMainTab(tab, shouldScroll=true){
+      activeMainTab = tab;
+      ['itinerary','packing','ticket','hotel'].forEach(id => {
+        document.getElementById(`${id}-view`).classList.toggle('hidden', id !== tab);
+        const nav = document.getElementById(`nav-${id}`);
+        nav.className = `tap rounded-2xl py-2 text-[10px] font-black ${id===tab ? 'text-sky-600 bg-sky-50' : 'text-slate-400'}`;
+      });
+      if(shouldScroll) window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    function renderItinerary(day){
+      const data = travelData[day];
+      document.getElementById('day-hero').innerHTML = `
+        <p class="text-[11px] font-black text-sky-300">DAY ${day}</p>
+        <h2 class="mt-1 text-base font-black leading-snug">${data.title}</h2>
+        <div class="mt-3 rounded-2xl bg-white/10 p-3 text-[12px] leading-relaxed text-slate-100">${data.clothing}</div>
+      `;
+      const timeline = document.getElementById('timeline');
+      timeline.innerHTML = data.items.map(item => itineraryCard(item)).join('');
+    }
+
+    function typeMeta(type){
+      const map = {
+        flight:['✈️','bg-indigo-50 text-indigo-700 border-indigo-100'], shop:['🛍️','bg-pink-50 text-pink-700 border-pink-100'], hotel:['🏨','bg-amber-50 text-amber-700 border-amber-100'], food:['🍜','bg-orange-50 text-orange-700 border-orange-100'], scene:['🏯','bg-emerald-50 text-emerald-700 border-emerald-100'], ship:['🛳️','bg-cyan-50 text-cyan-700 border-cyan-100'], home:['🏠','bg-rose-50 text-rose-700 border-rose-100'], taxi:['🚕','bg-yellow-50 text-yellow-800 border-yellow-200'], metro:['🚇','bg-violet-50 text-violet-700 border-violet-100'], ticket:['🎫','bg-blue-50 text-blue-700 border-blue-100']
+      };
+      return map[type] || ['📍','bg-slate-50 text-slate-700 border-slate-100'];
+    }
+
+    function itineraryCard(item){
+      const [icon, badge] = typeMeta(item.type);
+      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.name + ' ' + item.addr)}`;
+      return `
+        <article class="print-card relative pl-5">
+          <span class="absolute -left-[6px] top-5 h-3 w-3 rounded-full border-2 border-sky-500 bg-white"></span>
+          <div class="rounded-3xl border border-slate-100 bg-white p-4 card-shadow">
+            <div class="flex items-start justify-between gap-3">
+              <div class="shrink-0 rounded-2xl bg-sky-50 px-3 py-2 text-center">
+                <div class="text-[10px] font-black text-sky-500">TIME</div>
+                <div class="font-mono text-sm font-black text-sky-700">${item.time}</div>
+              </div>
+              <div class="min-w-0 flex-1 text-right">
+                <span class="inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black ${badge}"><span>${icon}</span><span class="truncate">${item.name}</span></span>
+              </div>
+            </div>
+            <p class="mt-3 rounded-2xl bg-slate-50 p-3 text-[12px] leading-relaxed text-slate-600">${item.note}</p>
+            <div class="mt-3 grid grid-cols-2 gap-2 no-print">
+              <a href="${mapUrl}" target="_blank" rel="noopener noreferrer" class="tap rounded-2xl border border-slate-200 bg-white py-3 text-center text-[11px] font-black text-slate-700">🗺️ 地圖導航</a>
+              <button onclick="openPlaceModal(${JSON.stringify(item.name)}, ${JSON.stringify(item.addr)}, ${JSON.stringify(item.note)}, ${JSON.stringify(mapUrl)})" class="tap rounded-2xl bg-slate-900 py-3 text-[11px] font-black text-white">🚕 問路大字</button>
+            </div>
+          </div>
+        </article>`;
+    }
+
+    function renderStaticPanels(){
+      document.getElementById('packing-view').innerHTML = panelWrap('🎒 盛夏打包清單', [
+        ['📱','手持／掛脖小風扇','京都坡道與奈良戶外行程救命神器。'],
+        ['🌂','抗 UV 晴雨傘','遮陽、防午後雷雨，一支扛兩種麻煩。'],
+        ['🧴','防曬乳、濕紙巾、補水用品','流汗後補擦防曬，避免第一天就變烤蝦。'],
+        ['👟','透氣防滑慢跑鞋','清水寺、奈良與大阪城都很吃腳力。'],
+        ['💳','ICOCA / Suica','地鐵、近鐵、京阪與便利商店皆方便。'],
+        ['🔋','行動電源與離線截圖','電子周遊券、地圖、天氣都靠手機，電量就是戰鬥力。']
+      ]);
+      document.getElementById('ticket-view').innerHTML = `
+        <div class="rounded-3xl bg-slate-950 p-4 text-white card-shadow"><h2 class="text-base font-black">🎫 大阪周遊券電子版避雷</h2><p class="mt-2 text-xs leading-relaxed text-slate-300">重點只有一句：電子周遊券請掃 QR Code，不要拿去感應 ICOCA 區。</p></div>
+        <div class="mt-4 space-y-3">
+          ${infoBlock('⚠️ 不要用 NFC 感應','手機電子周遊券沒有一般交通卡感應功能，請找支援 QR Code 的閘門或窗口。','rose')}
+          ${infoBlock('🚇 地鐵過閘','打開周遊券 QR Code 頁面，對準閘門讀取口掃描。手機亮度建議調高。','sky')}
+          ${infoBlock('🏯 景點兌票','大阪城、Aqua-Liner、聖瑪麗亞號、Wonder Cruise 等，依現場規則掃 QR 或先換實體票。熱門船班建議先換票。','amber')}
+          ${infoBlock('🔋 風險控管','截圖備援、行動電源充飽、同行者至少兩人保存 QR。不要讓手機電量比行程體力還先陣亡。','emerald')}
+        </div>`;
+      document.getElementById('hotel-view').innerHTML = `
+        <div class="rounded-3xl bg-slate-950 p-4 text-white card-shadow"><h2 class="text-base font-black">🏡 JS暁宅・靜谷</h2><p class="mt-2 text-xs text-slate-300">大阪市西成區｜花園町、天下茶屋動線友善</p></div>
+        <div class="mt-4 rounded-3xl border border-slate-100 bg-white p-4 card-shadow text-xs leading-relaxed text-slate-600">
+          <p class="text-[10px] font-black text-slate-400">日文地址</p>
+          <p class="mt-1 select-all text-sm font-black text-slate-900">〒557-0031 大阪府大阪市西成区鶴見橋1-15-21</p>
+          <hr class="my-4 border-slate-100">
+          <p class="text-[10px] font-black text-slate-400">英文地址</p>
+          <p class="mt-1">1 Chome-15-21 Tsurumibashi, Nishinari Ward, Osaka, 557-0031, Japan</p>
+          <div class="mt-4 rounded-2xl bg-amber-50 p-3 text-amber-900">退房日 11:00 前整理完成。可利用鶴見橋商店街往天下茶屋站，遮陽避雨，拖行李比較舒服。</div>
+          <div class="mt-4 grid grid-cols-2 gap-2">
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('大阪府大阪市西成区鶴見橋1-15-21')}" target="_blank" class="tap rounded-2xl bg-sky-600 py-3 text-center text-xs font-black text-white">🗺️ 地圖導航</a>
+            <button onclick="openPlaceModal('JS暁宅・靜谷','〒557-0031 大阪府大阪市西成区鶴見橋1-15-21','花園町駅2番出口から徒歩約5分、鶴見橋商店街の中です。','https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('大阪府大阪市西成区鶴見橋1-15-21')}')" class="tap rounded-2xl bg-slate-900 py-3 text-xs font-black text-white">🚕 問路大字</button>
+          </div>
+        </div>`;
+    }
+
+    function panelWrap(title, items){
+      return `<div class="rounded-3xl bg-slate-950 p-4 text-white card-shadow"><h2 class="text-base font-black">${title}</h2><p class="mt-2 text-xs text-slate-300">輕量化、抗暑、抗迷路。</p></div><div class="mt-4 space-y-3">${items.map(([emoji,name,note]) => `<label class="tap flex gap-3 rounded-3xl border border-slate-100 bg-white p-4 card-shadow"><input type="checkbox" class="mt-1 h-5 w-5 accent-sky-600"><div><div class="text-sm font-black text-slate-900">${emoji} ${name}</div><p class="mt-1 text-xs leading-relaxed text-slate-500">${note}</p></div></label>`).join('')}</div>`;
+    }
+    function infoBlock(title, text, color){
+      const map = { rose:'bg-rose-50 text-rose-900 border-rose-100', sky:'bg-sky-50 text-sky-900 border-sky-100', amber:'bg-amber-50 text-amber-900 border-amber-100', emerald:'bg-emerald-50 text-emerald-900 border-emerald-100' };
+      return `<div class="rounded-3xl border p-4 ${map[color]}"><p class="text-sm font-black">${title}</p><p class="mt-1 text-xs leading-relaxed">${text}</p></div>`;
+    }
+
+    function openPlaceModal(name, addr, note, mapUrl){
+      const addressText = name.includes('清水寺') ? '清水寺の観光駐車場までお願いします。' : addr;
+      modalPayload = { address: addressText };
+      document.getElementById('modal-name').textContent = name;
+      document.getElementById('modal-address').textContent = addressText;
+      document.getElementById('modal-note').textContent = '📍 ' + note;
+      document.getElementById('modal-map').href = mapUrl;
+      document.getElementById('modal').classList.remove('hidden');
+      document.getElementById('modal').classList.add('flex');
+    }
+    function closeModal(){ document.getElementById('modal').classList.add('hidden'); document.getElementById('modal').classList.remove('flex'); }
+    function copyModalAddress(){ copyText(modalPayload.address, '地址已複製'); }
+
+    function shareTextItinerary(){
+      const data = travelData[currentDay];
+      let text = `✨ 2026 京阪奈自由行 Day ${currentDay}\n${data.title}\n\n`;
+      data.items.forEach(i => { text += `⏰ ${i.time}｜${i.name}\n📍 ${i.addr}\n💡 ${i.note}\n\n`; });
+      text += '🏡 住宿：JS暁宅・靜谷｜大阪市西成区鶴見橋1-15-21';
+      copyText(text, '當日行程已複製，可貼到 LINE');
+    }
+    async function copyText(text, msg){
+      try{ await navigator.clipboard.writeText(text); showToast(msg); }
+      catch(e){
+        const t=document.createElement('textarea'); t.value=text; t.style.position='fixed'; t.style.opacity=0; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); showToast(msg);
+      }
+    }
+    function printCurrentDay(){ window.print(); }
+    function showToast(msg){
+      const el=document.getElementById('toast'); el.textContent=msg; el.classList.remove('opacity-0'); el.classList.add('opacity-100');
+      clearTimeout(window.__toastTimer); window.__toastTimer=setTimeout(()=>{el.classList.add('opacity-0'); el.classList.remove('opacity-100');},2600);
+    }
+  </script>
+</body>
+</html>
