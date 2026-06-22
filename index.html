@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>2026 京阪奈盛夏自由行神級手冊</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQyxxA5J0YjVbM1QH4k+f0rK0R0p4iU=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <style>
     :root{ --safe-bottom: env(safe-area-inset-bottom,0px); }
     *{ box-sizing:border-box; }
@@ -29,14 +31,65 @@
     .line-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
     .weather-skeleton{ background:linear-gradient(90deg,#f1f5f9,#e2e8f0,#f1f5f9); background-size:200% 100%; animation:pulse 1.2s infinite; }
     @keyframes pulse{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    .section-title{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:18px 0 10px; }
+    .section-title h3{ margin:0; font-size:13px; font-weight:950; color:#0f172a; }
+    .pill{ display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:6px 9px; font-size:10px; font-weight:900; white-space:nowrap; }
+    .quick-grid{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+    .quick-btn{ border-radius:20px; padding:10px 6px; min-height:58px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:10px; font-weight:950; line-height:1.2; }
+    .quick-btn .ico{ font-size:18px; line-height:1; }
+    .mini-stat{ border-radius:18px; background:rgba(255,255,255,.10); padding:10px; }
+    .mini-stat .label{ font-size:10px; color:#bae6fd; font-weight:900; }
+    .mini-stat .value{ margin-top:3px; font-size:12px; line-height:1.35; color:white; font-weight:950; }
+    .card-actions{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .timeline-index{ position:absolute; left:-17px; top:14px; width:30px; height:30px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:#fff; border:2px solid #0ea5e9; color:#0369a1; font-size:11px; font-weight:950; box-shadow:0 8px 20px rgba(14,165,233,.18); }
+    .detail-box{ border-radius:18px; border:1px solid #e2e8f0; background:#fff; overflow:hidden; }
+    .detail-box summary{ list-style:none; cursor:pointer; padding:10px 12px; font-size:11px; font-weight:950; color:#334155; display:flex; align-items:center; justify-content:space-between; }
+    .detail-box summary::-webkit-details-marker{ display:none; }
+    .detail-box summary:after{ content:'展開'; color:#0284c7; font-size:10px; }
+    .detail-box[open] summary:after{ content:'收合'; }
+    .detail-box .addr{ border-top:1px solid #f1f5f9; padding:10px 12px; font-size:11px; line-height:1.55; color:#64748b; user-select:all; }
+    .route-map-box{ height:430px; width:100%; border-radius:24px; overflow:hidden; border:1px solid #e2e8f0; background:#f8fafc; }
+    .route-marker{ width:28px; height:28px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:#7c3aed; color:white; border:3px solid white; font-size:12px; font-weight:950; box-shadow:0 8px 18px rgba(88,28,135,.30); }
+    .route-popup-title{ font-size:12px; font-weight:950; color:#0f172a; }
+    .route-popup-note{ margin-top:3px; font-size:11px; color:#64748b; line-height:1.45; }
+    .route-fallback{ position:relative; height:100%; min-height:430px; overflow:hidden; border-radius:24px; background:linear-gradient(135deg,#eef6ff 0%,#f8fafc 42%,#ecfdf5 100%); }
+    .route-fallback:before{ content:""; position:absolute; inset:0; background-image:linear-gradient(rgba(148,163,184,.16) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.16) 1px,transparent 1px); background-size:28px 28px; opacity:.7; }
+    .route-fallback svg{ position:absolute; inset:0; width:100%; height:100%; }
+    .fallback-marker{ position:absolute; z-index:3; transform:translate(-50%,-50%); display:flex; align-items:center; gap:6px; max-width:52%; }
+    .fallback-marker .num{ flex:0 0 auto; width:30px; height:30px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:#7c3aed; color:white; border:3px solid white; font-size:12px; font-weight:950; box-shadow:0 10px 22px rgba(88,28,135,.28); }
+    .fallback-marker .name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-radius:999px; background:rgba(255,255,255,.94); border:1px solid rgba(226,232,240,.95); padding:6px 9px; font-size:11px; font-weight:950; color:#0f172a; box-shadow:0 8px 20px rgba(15,23,42,.10); }
+    .route-fallback-hint{ position:absolute; left:12px; right:12px; bottom:12px; z-index:4; border-radius:20px; background:rgba(255,255,255,.92); border:1px solid #e2e8f0; padding:10px 12px; font-size:11px; line-height:1.5; color:#475569; box-shadow:0 8px 22px rgba(15,23,42,.08); }
+
+    .floating-top{ position:fixed; right:calc(50% - 230px); bottom:calc(86px + var(--safe-bottom)); z-index:38; }
+    .float-btn{ width:46px; height:46px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:#0f172a; color:white; box-shadow:0 14px 34px rgba(15,23,42,.22); font-size:18px; }
+    @media(max-width:520px){ .floating-top{ right:14px; } .quick-grid{ grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; } .quick-btn{ min-height:54px; border-radius:18px; } }
+
+    #print-area{ display:none; }
     @media print{
-      body{ background:white!important; }
-      .no-print, nav, header, #bottom-nav, #toast, .modal-backdrop{ display:none!important; }
-      .app-shell{ box-shadow:none; max-width:none; overflow:visible; }
-      main{ padding:0!important; }
-      #print-area{ display:block!important; }
-      .print-card{ break-inside:avoid; page-break-inside:avoid; }
+      @page{ size:A4; margin:12mm; }
+      body{ background:white!important; color:#0f172a!important; }
+      body > *:not(#print-area){ display:none!important; }
+      #print-area{ display:block!important; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,"Microsoft JhengHei",sans-serif; }
+      .print-sheet{ max-width:760px; margin:0 auto; }
+      .print-title{ font-size:22px; font-weight:900; margin:0 0 8px; }
+      .print-subtitle{ font-size:13px; color:#475569; margin:0 0 14px; line-height:1.6; }
+      .print-card{ break-inside:avoid; page-break-inside:avoid; border:1px solid #e2e8f0; border-radius:16px; padding:12px; margin:0 0 10px; }
+      .print-time{ font-weight:900; color:#0369a1; margin-right:8px; }
+      .print-name{ font-weight:900; }
+      .print-note{ margin-top:6px; font-size:12px; line-height:1.6; color:#334155; }
+      .print-addr{ margin-top:4px; font-size:11px; color:#64748b; }
     }
+  
+    .fallback-marker-dot{ position:absolute; z-index:5; transform:translate(-50%,-50%); width:32px; height:32px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:#7c3aed; color:#fff; border:3px solid #fff; font-size:13px; font-weight:950; box-shadow:0 10px 22px rgba(88,28,135,.28); }
+    .fallback-marker-dot:active{ transform:translate(-50%,-50%) scale(.92); }
+    .route-compass{ position:absolute; right:14px; top:14px; z-index:4; width:34px; height:34px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.92); border:1px solid #e2e8f0; font-size:11px; font-weight:950; color:#475569; box-shadow:0 8px 20px rgba(15,23,42,.08); }
+    .route-map-caption{ position:absolute; left:12px; right:12px; bottom:12px; z-index:4; border-radius:20px; background:rgba(255,255,255,.94); border:1px solid #e2e8f0; padding:10px 12px; font-size:11px; line-height:1.5; color:#475569; box-shadow:0 8px 22px rgba(15,23,42,.08); }
+    .route-chip-wrap{ margin-top:10px; max-height:176px; overflow:auto; padding-right:2px; display:grid; gap:8px; }
+    .route-chip{ display:flex; gap:8px; align-items:flex-start; border:1px solid #e2e8f0; background:#fff; border-radius:18px; padding:9px 10px; font-size:12px; transition:.18s ease; }
+    .route-chip-active{ border-color:#7c3aed; background:#f5f3ff; box-shadow:0 10px 24px rgba(124,58,237,.12); }
+    .route-chip-num{ flex:0 0 auto; display:flex; width:24px; height:24px; align-items:center; justify-content:center; border-radius:999px; background:#7c3aed; color:#fff; font-size:11px; font-weight:950; }
+
   </style>
 </head>
 <body>
@@ -77,13 +130,24 @@
 
     <main class="px-4 pt-4 pb-28">
       <section id="itinerary-view">
-        <div class="grid grid-cols-2 gap-3 no-print">
-          <button onclick="printCurrentDay()" class="tap rounded-2xl bg-emerald-600 px-4 py-3 text-xs font-black text-white shadow-lg shadow-emerald-500/15">📄 列印／存 PDF</button>
-          <button onclick="shareTextItinerary()" class="tap rounded-2xl bg-slate-900 px-4 py-3 text-xs font-black text-white shadow-lg shadow-slate-900/15">🔗 複製 LINE 文字</button>
+        <div class="section-title no-print">
+          <h3>快速操作</h3>
+          <span id="day-mini-info" class="pill bg-sky-50 text-sky-700">Day 1</span>
+        </div>
+        <div class="quick-grid no-print">
+          <button onclick="showPdfPage()" class="tap quick-btn bg-emerald-600 text-white shadow-lg shadow-emerald-500/15"><span class="ico">📄</span><span>顯示<br>PDF</span></button>
+          <button onclick="shareTextItinerary()" class="tap quick-btn bg-slate-900 text-white shadow-lg shadow-slate-900/15"><span class="ico">🔗</span><span>LINE<br>文字</span></button>
+          <button onclick="refreshWeather(true)" class="tap quick-btn bg-sky-600 text-white shadow-lg shadow-sky-500/15"><span class="ico">🌦️</span><span>更新<br>天氣</span></button>
+          <button onclick="openRouteMap()" class="tap quick-btn bg-orange-500 text-white shadow-lg shadow-orange-500/15"><span class="ico">🗺️</span><span>生成<br>地圖</span></button>
+          <button onclick="scrollToTimeline()" class="tap quick-btn bg-white text-slate-700 border border-slate-200 shadow-sm"><span class="ico">⬇️</span><span>看<br>行程</span></button>
         </div>
 
         <div id="day-hero" class="mt-4 rounded-3xl bg-slate-950 p-4 text-white card-shadow"></div>
-        <div id="timeline" class="relative ml-3 mt-5 border-l-2 border-slate-100 space-y-5 pb-2"></div>
+        <div class="section-title">
+          <h3>今日時間軸</h3>
+          <span id="timeline-count" class="pill bg-slate-100 text-slate-600">0 個停靠點</span>
+        </div>
+        <div id="timeline" class="relative ml-4 mt-3 border-l-2 border-slate-100 space-y-5 pb-2"></div>
       </section>
 
       <section id="packing-view" class="hidden"></section>
@@ -97,6 +161,11 @@
       <button onclick="switchMainTab('ticket')" id="nav-ticket" class="tap rounded-2xl py-2 text-[10px] font-black text-slate-400"><span class="block text-xl">🎫</span>周遊券</button>
       <button onclick="switchMainTab('hotel')" id="nav-hotel" class="tap rounded-2xl py-2 text-[10px] font-black text-slate-400"><span class="block text-xl">🏡</span>民宿</button>
     </nav>
+  </div>
+
+
+  <div class="floating-top no-print">
+    <button type="button" onclick="window.scrollTo({top:0,behavior:'smooth'})" class="tap float-btn" aria-label="回到上方">↑</button>
   </div>
 
   <div id="modal" class="modal-backdrop hidden fixed inset-0 z-50 items-end justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:items-center">
@@ -137,7 +206,40 @@
     </div>
   </div>
 
+
+
+  <div id="route-map-modal" class="modal-backdrop hidden fixed inset-0 z-[70] items-end justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:items-center">
+    <div class="flex max-h-[92vh] w-full max-w-md flex-col rounded-[28px] bg-white p-4 shadow-2xl">
+      <div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+        <div>
+          <p class="text-[10px] font-black tracking-[.14em] text-orange-600">TODAY ROUTE MAP</p>
+          <h3 id="route-map-title" class="mt-1 text-base font-black text-slate-900">當日行程地圖</h3>
+          <p id="route-map-subtitle" class="mt-1 text-[11px] text-slate-500">依行程順序標示 1、2、3…</p>
+        </div>
+        <button onclick="closeRouteMap()" class="tap rounded-full bg-slate-100 px-3 py-2 text-xs font-black text-slate-500">✕</button>
+      </div>
+
+      <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+        <div class="rounded-2xl bg-orange-50 p-2"><p class="text-[10px] font-black text-orange-500">停靠點</p><p id="route-stop-count" class="mt-1 text-sm font-black text-slate-900">-</p></div>
+        <div class="rounded-2xl bg-sky-50 p-2"><p class="text-[10px] font-black text-sky-500">直線總距離</p><p id="route-distance" class="mt-1 text-sm font-black text-slate-900">-</p></div>
+        <div class="rounded-2xl bg-emerald-50 p-2"><p class="text-[10px] font-black text-emerald-500">範圍跨度</p><p id="route-span" class="mt-1 text-sm font-black text-slate-900">-</p></div>
+      </div>
+
+      <div id="route-map" class="route-map-box mt-3"></div>
+
+      <div id="route-list" class="mt-3 max-h-40 space-y-2 overflow-y-auto pr-1 text-xs"></div>
+
+      <div class="mt-3 grid grid-cols-2 gap-3">
+        <a id="route-google-link" target="_blank" rel="noopener noreferrer" class="tap rounded-2xl bg-sky-600 py-3 text-center text-xs font-black text-white">開啟 Google Maps 實際導航</a>
+        <button onclick="closeRouteMap()" class="tap rounded-2xl bg-slate-900 py-3 text-xs font-black text-white">返回手冊</button>
+      </div>
+      <p class="mt-2 text-[10px] leading-relaxed text-slate-400">測試版說明：地圖內以行程順序標示 1、2、3…，紫線為整體範圍示意；實際步行與搭車路線仍以 Google Maps 現場導航為準。</p>
+    </div>
+  </div>
+
   <div id="toast" class="pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-slate-950/90 px-4 py-2.5 text-[11px] font-black text-white opacity-0 shadow-xl transition-opacity">完成</div>
+
+  <div id="print-area" aria-hidden="true"></div>
 
   <script>
 const travelData = {
@@ -324,12 +426,13 @@ const travelData = {
       renderStaticPanels();
       switchDay(1);
       refreshWeather(false);
+      bindUiHelpers();
     });
 
     function renderDayTabs(){
       const wrap = document.getElementById('day-tabs');
       wrap.innerHTML = Object.keys(travelData).map(day => `
-        <button id="day-${day}" onclick="switchDay(${day})" class="tap snap-center shrink-0 rounded-2xl px-4 py-2.5 text-xs font-black bg-slate-100 text-slate-500">Day ${day}</button>
+        <button id="day-${day}" onclick="switchDay(${day})" class="tap snap-center shrink-0 rounded-2xl px-4 py-2.5 text-xs font-black bg-slate-100 text-slate-500">D${day}</button>
       `).join('');
     }
 
@@ -468,15 +571,40 @@ const travelData = {
       if(shouldScroll) window.scrollTo({top:0, behavior:'smooth'});
     }
 
+    function scrollToTimeline(){
+      document.getElementById('timeline').scrollIntoView({behavior:'smooth', block:'start'});
+    }
+
+    function getDayStats(data){
+      const first = data.items[0] || {};
+      const last = data.items[data.items.length-1] || {};
+      const outdoorTypes = new Set(['scene','ship','taxi','shop']);
+      const outdoor = data.items.filter(i => outdoorTypes.has(i.type)).length;
+      return { first, last, outdoor, count:data.items.length };
+    }
+
     function renderItinerary(day){
       const data = travelData[day];
+      const stats = getDayStats(data);
+      document.getElementById('day-mini-info').textContent = `Day ${day}｜${stats.count}站`;
+      document.getElementById('timeline-count').textContent = `${stats.count} 個停靠點`;
       document.getElementById('day-hero').innerHTML = `
-        <p class="text-[11px] font-black text-sky-300">DAY ${day}</p>
-        <h2 class="mt-1 text-base font-black leading-snug">${data.title}</h2>
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-[11px] font-black tracking-[.18em] text-sky-300">DAY ${day}</p>
+            <h2 class="mt-1 text-base font-black leading-snug">${data.title}</h2>
+          </div>
+          <span class="pill bg-white/10 text-sky-100 border border-white/10">${stats.count}站</span>
+        </div>
         <div class="mt-3 rounded-2xl bg-white/10 p-3 text-[12px] leading-relaxed text-slate-100">${data.clothing}</div>
+        <div class="mt-3 grid grid-cols-3 gap-2">
+          <div class="mini-stat"><div class="label">第一站</div><div class="value">${stats.first.time || '-'}<br>${stats.first.name || '-'}</div></div>
+          <div class="mini-stat"><div class="label">戶外/移動</div><div class="value">約 ${stats.outdoor} 站<br>注意補水</div></div>
+          <div class="mini-stat"><div class="label">收尾</div><div class="value">${stats.last.time || '-'}<br>${stats.last.name || '-'}</div></div>
+        </div>
       `;
       const timeline = document.getElementById('timeline');
-      timeline.innerHTML = data.items.map(item => itineraryCard(item)).join('');
+      timeline.innerHTML = data.items.map((item, idx) => itineraryCard(item, idx)).join('');
     }
 
     function typeMeta(type){
@@ -486,12 +614,12 @@ const travelData = {
       return map[type] || ['📍','bg-slate-50 text-slate-700 border-slate-100'];
     }
 
-    function itineraryCard(item){
+    function itineraryCard(item, idx=0){
       const [icon, badge] = typeMeta(item.type);
       const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.name + ' ' + item.addr)}`;
       return `
-        <article class="print-card relative pl-5">
-          <span class="absolute -left-[6px] top-5 h-3 w-3 rounded-full border-2 border-sky-500 bg-white"></span>
+        <article class="print-card relative pl-6">
+          <span class="timeline-index">${idx+1}</span>
           <div class="rounded-3xl border border-slate-100 bg-white p-4 card-shadow">
             <div class="flex items-start justify-between gap-3">
               <div class="shrink-0 rounded-2xl bg-sky-50 px-3 py-2 text-center">
@@ -503,9 +631,13 @@ const travelData = {
               </div>
             </div>
             <p class="mt-3 rounded-2xl bg-slate-50 p-3 text-[12px] leading-relaxed text-slate-600">${item.note}</p>
-            <div class="mt-3 grid grid-cols-2 gap-2 no-print">
+            <details class="detail-box mt-3">
+              <summary>📍 地址資訊</summary>
+              <div class="addr">${item.addr}</div>
+            </details>
+            <div class="mt-3 card-actions no-print">
               <a href="${mapUrl}" target="_blank" rel="noopener noreferrer" class="tap rounded-2xl border border-slate-200 bg-white py-3 text-center text-[11px] font-black text-slate-700">🗺️ 地圖導航</a>
-              <button onclick="openPlaceModal(${JSON.stringify(item.name)}, ${JSON.stringify(item.addr)}, ${JSON.stringify(item.note)}, ${JSON.stringify(mapUrl)})" class="tap rounded-2xl bg-slate-900 py-3 text-[11px] font-black text-white">🚕 問路大字</button>
+              <button type="button" onclick='openPlaceModal(${JSON.stringify(item.name)}, ${JSON.stringify(item.addr)}, ${JSON.stringify(item.note)}, ${JSON.stringify(mapUrl)})' class="tap rounded-2xl bg-slate-900 py-3 text-[11px] font-black text-white">🚕 問路大字</button>
             </div>
           </div>
         </article>`;
@@ -539,7 +671,7 @@ const travelData = {
           <div class="mt-4 rounded-2xl bg-amber-50 p-3 text-amber-900">退房日 11:00 前整理完成。可利用鶴見橋商店街往天下茶屋站，遮陽避雨，拖行李比較舒服。</div>
           <div class="mt-4 grid grid-cols-2 gap-2">
             <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('大阪府大阪市西成区鶴見橋1-15-21')}" target="_blank" class="tap rounded-2xl bg-sky-600 py-3 text-center text-xs font-black text-white">🗺️ 地圖導航</a>
-            <button onclick="openPlaceModal('JS暁宅・靜谷','〒557-0031 大阪府大阪市西成区鶴見橋1-15-21','花園町駅2番出口から徒歩約5分、鶴見橋商店街の中です。','https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('大阪府大阪市西成区鶴見橋1-15-21')}')" class="tap rounded-2xl bg-slate-900 py-3 text-xs font-black text-white">🚕 問路大字</button>
+            <button type="button" onclick="openPlaceModal('JS暁宅・靜谷','〒557-0031 大阪府大阪市西成区鶴見橋1-15-21','花園町駅2番出口から徒歩約5分、鶴見橋商店街の中です。','https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('大阪府大阪市西成区鶴見橋1-15-21')}')" class="tap rounded-2xl bg-slate-900 py-3 text-xs font-black text-white">🚕 問路大字</button>
           </div>
         </div>`;
     }
@@ -578,7 +710,416 @@ const travelData = {
         const t=document.createElement('textarea'); t.value=text; t.style.position='fixed'; t.style.opacity=0; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); showToast(msg);
       }
     }
-    function printCurrentDay(){ window.print(); }
+    function escapeHtml(value){
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+
+    function buildPrintArea(){
+      const data = travelData[currentDay];
+      const items = data.items.map(item => `
+        <div class="print-card">
+          <div><span class="print-time">${escapeHtml(item.time)}</span><span class="print-name">${escapeHtml(item.name)}</span></div>
+          <div class="print-note">${escapeHtml(item.note)}</div>
+          <div class="print-addr">📍 ${escapeHtml(item.addr)}</div>
+        </div>
+      `).join('');
+      document.getElementById('print-area').innerHTML = `
+        <section class="print-sheet">
+          <p style="font-size:11px;font-weight:900;color:#0284c7;letter-spacing:.14em;margin:0 0 6px;">KANSAI 2026｜DAY ${currentDay}</p>
+          <h1 class="print-title">${escapeHtml(data.title)}</h1>
+          <p class="print-subtitle">${escapeHtml(data.clothing)}</p>
+          ${items}
+          <p style="margin-top:14px;font-size:11px;color:#64748b;">住宿：JS暁宅・靜谷｜〒557-0031 大阪府大阪市西成区鶴見橋1-15-21</p>
+        </section>
+      `;
+    }
+
+    function getPdfPageHTML(){
+      const data = travelData[currentDay];
+      const cards = data.items.map(item => `
+        <article class="pdf-card">
+          <div class="pdf-row">
+            <span class="pdf-time">${escapeHtml(item.time)}</span>
+            <span class="pdf-name">${escapeHtml(item.name)}</span>
+          </div>
+          <p class="pdf-note">${escapeHtml(item.note)}</p>
+          <p class="pdf-addr">📍 ${escapeHtml(item.addr)}</p>
+        </article>
+      `).join('');
+
+      return `<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>PDF 預覽｜2026 京阪奈 Day ${currentDay}</title>
+  <style>
+    *{box-sizing:border-box;}
+    body{margin:0;background:#e2e8f0;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,"Microsoft JhengHei",sans-serif;}
+    .toolbar{position:sticky;top:0;z-index:20;background:rgba(15,23,42,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:12px;display:flex;gap:10px;justify-content:center;align-items:center;}
+    .toolbar button{border:0;border-radius:16px;padding:12px 14px;font-size:13px;font-weight:900;cursor:pointer;}
+    .print-btn{background:#0284c7;color:white;}
+    .close-btn{background:white;color:#334155;}
+    .hint{max-width:780px;margin:12px auto 0;padding:0 16px;color:#475569;font-size:12px;line-height:1.6;text-align:center;}
+    .sheet{width:min(92vw,794px);min-height:1123px;margin:14px auto 28px;background:white;border-radius:18px;box-shadow:0 24px 70px rgba(15,23,42,.22);padding:42px;}
+    .kicker{margin:0 0 8px;font-size:12px;font-weight:900;letter-spacing:.16em;color:#0284c7;}
+    h1{margin:0;font-size:25px;line-height:1.35;font-weight:950;color:#0f172a;}
+    .subtitle{margin:10px 0 18px;padding:12px 14px;border-radius:16px;background:#f0f9ff;color:#075985;font-size:13px;line-height:1.7;font-weight:700;}
+    .pdf-card{break-inside:avoid;page-break-inside:avoid;border:1px solid #e2e8f0;border-radius:18px;padding:14px 15px;margin:0 0 12px;background:#fff;}
+    .pdf-row{display:flex;gap:10px;align-items:flex-start;}
+    .pdf-time{flex:0 0 auto;font-size:14px;font-weight:950;color:#0369a1;font-variant-numeric:tabular-nums;}
+    .pdf-name{font-size:14px;font-weight:950;color:#0f172a;}
+    .pdf-note{margin:8px 0 0;font-size:12.5px;line-height:1.75;color:#334155;}
+    .pdf-addr{margin:6px 0 0;font-size:11.5px;line-height:1.55;color:#64748b;}
+    .footer{margin-top:18px;border-top:1px solid #e2e8f0;padding-top:12px;font-size:11.5px;line-height:1.6;color:#64748b;}
+    @media(max-width:640px){.sheet{width:94vw;min-height:auto;padding:24px 18px;border-radius:16px;}h1{font-size:20px}.subtitle{font-size:12px}.pdf-row{display:block}.pdf-time{display:block;margin-bottom:4px}.toolbar{padding:10px}.toolbar button{flex:1;max-width:170px}}
+    @media print{
+      @page{size:A4;margin:12mm;}
+      body{background:white;}
+      .toolbar,.hint{display:none!important;}
+      .sheet{width:auto;min-height:auto;margin:0;box-shadow:none;border-radius:0;padding:0;}
+      .pdf-card{border-color:#dbe3ee;}
+    }
+  
+    .fallback-marker-dot{ position:absolute; z-index:5; transform:translate(-50%,-50%); width:32px; height:32px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:#7c3aed; color:#fff; border:3px solid #fff; font-size:13px; font-weight:950; box-shadow:0 10px 22px rgba(88,28,135,.28); }
+    .fallback-marker-dot:active{ transform:translate(-50%,-50%) scale(.92); }
+    .route-compass{ position:absolute; right:14px; top:14px; z-index:4; width:34px; height:34px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.92); border:1px solid #e2e8f0; font-size:11px; font-weight:950; color:#475569; box-shadow:0 8px 20px rgba(15,23,42,.08); }
+    .route-map-caption{ position:absolute; left:12px; right:12px; bottom:12px; z-index:4; border-radius:20px; background:rgba(255,255,255,.94); border:1px solid #e2e8f0; padding:10px 12px; font-size:11px; line-height:1.5; color:#475569; box-shadow:0 8px 22px rgba(15,23,42,.08); }
+    .route-chip-wrap{ margin-top:10px; max-height:176px; overflow:auto; padding-right:2px; display:grid; gap:8px; }
+    .route-chip{ display:flex; gap:8px; align-items:flex-start; border:1px solid #e2e8f0; background:#fff; border-radius:18px; padding:9px 10px; font-size:12px; transition:.18s ease; }
+    .route-chip-active{ border-color:#7c3aed; background:#f5f3ff; box-shadow:0 10px 24px rgba(124,58,237,.12); }
+    .route-chip-num{ flex:0 0 auto; display:flex; width:24px; height:24px; align-items:center; justify-content:center; border-radius:999px; background:#7c3aed; color:#fff; font-size:11px; font-weight:950; }
+
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button class="print-btn" onclick="window.print()">列印／另存 PDF</button>
+    <button class="close-btn" onclick="window.close()">關閉預覽</button>
+  </div>
+  <p class="hint">這是當日行程的 PDF 預覽頁。確認內容後，可按「列印／另存 PDF」；手機上也可用分享選單儲存。</p>
+  <main class="sheet">
+    <p class="kicker">KANSAI 2026｜DAY ${currentDay}</p>
+    <h1>${escapeHtml(data.title)}</h1>
+    <p class="subtitle">${escapeHtml(data.clothing)}</p>
+    ${cards}
+    <p class="footer">住宿：JS暁宅・靜谷｜〒557-0031 大阪府大阪市西成区鶴見橋1-15-21</p>
+  </main>
+</body>
+</html>`;
+    }
+
+    function showPdfPage(){
+      try{
+        const data = travelData[currentDay];
+        const cards = data.items.map(item => `
+          <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm break-inside-avoid">
+            <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
+              <span class="text-sm font-black tracking-wider text-sky-700">${escapeHtml(item.time)}</span>
+              <span class="text-sm font-black leading-relaxed text-slate-950">${escapeHtml(item.name)}</span>
+            </div>
+            <p class="mt-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold leading-relaxed text-slate-700">${escapeHtml(item.note)}</p>
+            <p class="mt-2 text-[11px] leading-relaxed text-slate-500">📍 ${escapeHtml(item.addr)}</p>
+          </article>
+        `).join('');
+
+        let panel = document.getElementById('pdf-preview-panel');
+        if(!panel){
+          panel = document.createElement('div');
+          panel.id = 'pdf-preview-panel';
+          panel.className = 'fixed inset-0 z-[90] hidden overflow-y-auto bg-slate-900/80 p-3 backdrop-blur-md';
+          document.body.appendChild(panel);
+        }
+
+        panel.innerHTML = `
+          <div class="mx-auto max-w-3xl pb-8">
+            <div class="sticky top-3 z-10 mb-3 rounded-3xl bg-slate-950/95 p-3 shadow-2xl backdrop-blur-md">
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" onclick="printPdfPreview()" class="tap rounded-2xl bg-sky-600 px-4 py-3 text-xs font-black text-white shadow-lg shadow-sky-900/20">🖨️ 列印／另存 PDF</button>
+                <button type="button" onclick="closePdfPreview()" class="tap rounded-2xl bg-white px-4 py-3 text-xs font-black text-slate-700">返回手冊</button>
+              </div>
+              <p class="mt-2 text-center text-[11px] font-bold leading-relaxed text-slate-300">PDF 預覽在本頁顯示。確認內容後再列印或另存 PDF。</p>
+            </div>
+
+            <main id="pdf-preview-sheet" class="rounded-3xl bg-white p-5 shadow-2xl sm:p-8">
+              <p class="mb-2 text-[11px] font-black tracking-[0.18em] text-sky-600">KANSAI 2026｜DAY ${currentDay}</p>
+              <h1 class="text-xl font-black leading-snug text-slate-950 sm:text-2xl">${escapeHtml(data.title)}</h1>
+              <p class="mt-3 rounded-2xl bg-sky-50 p-3 text-xs font-bold leading-relaxed text-sky-900 sm:text-sm">${escapeHtml(data.clothing)}</p>
+              <div class="mt-4 space-y-3">${cards}</div>
+              <p class="mt-5 border-t border-slate-200 pt-3 text-[11px] leading-relaxed text-slate-500">住宿：JS暁宅・靜谷｜〒557-0031 大阪府大阪市西成区鶴見橋1-15-21</p>
+            </main>
+          </div>
+        `;
+        panel.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        showToast('PDF 預覽已顯示在本頁');
+      }catch(e){
+        console.error(e);
+        showToast('PDF 預覽開啟失敗，請重新整理後再試');
+      }
+    }
+
+    function closePdfPreview(){
+      const panel = document.getElementById('pdf-preview-panel');
+      if(panel) panel.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    function printPdfPreview(){
+      buildPrintArea();
+      setTimeout(() => window.print(), 80);
+    }
+
+
+    const routeCoords = {
+      1: [[34.4347,135.2441],[34.4126,135.2982],[34.6445,135.4937],[34.6633,135.5016],[34.6687,135.5013],[34.6445,135.4937]],
+      2: [[34.6904,135.5328],[34.6873,135.5259],[34.6904,135.5328],[34.7054,135.4896],[34.7046,135.4993],[34.6690,135.5050],[34.6690,135.5050],[34.6525,135.5063],[34.6445,135.4937]],
+      3: [[34.6610,135.4975],[34.9962,135.7809],[34.9949,135.7850],[35.0037,135.7786],[35.0034,135.7750],[35.0052,135.7717],[34.6445,135.4937]],
+      4: [[34.6672,135.5001],[34.6850,135.8430],[34.6890,135.8398],[34.6844,135.8275],[34.6817,135.8486],[34.6832,135.8296],[34.6445,135.4937]],
+      5: [[34.7107,135.5112],[34.7102,135.5114],[34.7061,135.5100],[34.6816,135.5065],[34.6563,135.4309],[34.6563,135.4309],[34.6563,135.4309],[34.6525,135.5063],[34.6445,135.4937]],
+      6: [[34.6625,135.4976],[34.6599,135.5006],[34.6445,135.4937],[34.6370,135.4963],[34.6370,135.4963],[34.4347,135.2441]]
+    };
+    let routeMapInstance = null;
+    let routeMapLayer = null;
+
+    function haversineKm(a,b){
+      const R=6371, toRad=d=>d*Math.PI/180;
+      const dLat=toRad(b[0]-a[0]), dLon=toRad(b[1]-a[1]);
+      const lat1=toRad(a[0]), lat2=toRad(b[0]);
+      const x=Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+      return 2*R*Math.asin(Math.sqrt(x));
+    }
+    function sumRouteKm(coords){ return coords.slice(1).reduce((sum,pt,i)=>sum+haversineKm(coords[i],pt),0); }
+    function spanKm(coords){
+      const lats=coords.map(c=>c[0]), lngs=coords.map(c=>c[1]);
+      return haversineKm([Math.min(...lats),Math.min(...lngs)],[Math.max(...lats),Math.max(...lngs)]);
+    }
+    function routeGoogleUrl(items){
+      const q = s => encodeURIComponent(s.name + ' ' + s.addr);
+      if(items.length <= 1) return `https://www.google.com/maps/search/?api=1&query=${q(items[0])}`;
+      const origin=q(items[0]), destination=q(items[items.length-1]);
+      const waypoints = items.slice(1,-1).map(q).join('|');
+      return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=transit`;
+    }
+    function openRouteMap(){
+      const data = travelData[currentDay];
+      const coords = routeCoords[currentDay];
+      const modal = document.getElementById('route-map-modal');
+      document.getElementById('route-map-title').textContent = `Day ${currentDay} 當日行程地圖`;
+      document.getElementById('route-map-subtitle').textContent = data.title.replace(/^Day\s*\d+\s*[^｜]*｜\s*/, '');
+      document.getElementById('route-stop-count').textContent = `${data.items.length} 站`;
+      document.getElementById('route-distance').textContent = `約 ${sumRouteKm(coords).toFixed(1)} km`;
+      document.getElementById('route-span').textContent = `約 ${spanKm(coords).toFixed(1)} km`;
+      document.getElementById('route-google-link').href = routeGoogleUrl(data.items);
+      document.getElementById('route-list').innerHTML = '';
+      modal.classList.remove('hidden'); modal.classList.add('flex');
+      document.body.style.overflow='hidden';
+      setTimeout(()=>renderRouteMap(coords, data.items), 120);
+    }
+    function renderRouteMap(coords, items){
+      const el = document.getElementById('route-map');
+      const listEl = document.getElementById('route-list');
+
+      // 這版優先顯示真正的 OpenStreetMap 底圖，並將 1、2、3… 直接套繪在地圖上。
+      // 若使用者離線、CDN 被擋或 Leaflet 無法載入，才自動切回本機 SVG 示意圖。
+      if(typeof L === 'undefined'){
+        renderRouteFallback(coords, items);
+        return;
+      }
+
+      try{
+        if(routeMapInstance){
+          routeMapInstance.remove();
+          routeMapInstance = null;
+        }
+        el.innerHTML = '<div id="leaflet-route-map" style="width:100%;height:100%;min-height:430px;"></div>';
+        listEl.innerHTML = buildRouteStopList(items);
+
+        routeMapInstance = L.map('leaflet-route-map', {
+          zoomControl: true,
+          attributionControl: true,
+          scrollWheelZoom: false,
+          tap: true
+        });
+
+        const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(routeMapInstance);
+
+        let tileErrorCount = 0;
+        tileLayer.on('tileerror', () => {
+          tileErrorCount += 1;
+          if(tileErrorCount >= 4){
+            renderRouteFallback(coords, items);
+          }
+        });
+
+        const latlngs = coords.map(([lat,lng]) => [lat,lng]);
+        const bounds = L.latLngBounds(latlngs);
+
+        L.polyline(latlngs, {
+          color: '#7c3aed',
+          weight: 5,
+          opacity: .88,
+          dashArray: '10 8',
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(routeMapInstance);
+
+        latlngs.forEach((latlng, idx) => {
+          const item = items[idx];
+          const marker = L.marker(latlng, {
+            icon: L.divIcon({
+              className: '',
+              html: `<button type="button" class="route-marker" aria-label="第 ${idx+1} 站 ${escapeHtml(item.name)}">${idx+1}</button>`,
+              iconSize: [34,34],
+              iconAnchor: [17,17],
+              popupAnchor: [0,-18]
+            })
+          }).addTo(routeMapInstance);
+
+          marker.bindPopup(`
+            <div class="route-popup-title">${idx+1}. ${escapeHtml(item.time)}｜${escapeHtml(item.name)}</div>
+            <div class="route-popup-note">${escapeHtml(item.addr)}</div>
+          `);
+
+          marker.on('click', () => highlightRouteStop(idx));
+        });
+
+        routeMapInstance.fitBounds(bounds, { padding: [42,42], maxZoom: 15 });
+
+        // Modal 開啟後 Leaflet 需要重新計算尺寸，不然手機上有時會只顯示半張圖。
+        setTimeout(() => {
+          if(routeMapInstance){
+            routeMapInstance.invalidateSize();
+            routeMapInstance.fitBounds(bounds, { padding: [42,42], maxZoom: 15 });
+          }
+        }, 250);
+
+        const note = document.createElement('div');
+        note.className = 'absolute left-3 right-3 bottom-3 z-[500] rounded-2xl border border-white/70 bg-white/90 px-3 py-2 text-[11px] font-bold leading-relaxed text-slate-600 shadow-lg backdrop-blur';
+        note.innerHTML = '已套繪在 OpenStreetMap 實景地圖上；紫色虛線為當日行程順序，實際步行／搭車請以 Google Maps 導航為準。';
+        el.style.position = 'relative';
+        el.appendChild(note);
+      }catch(err){
+        console.error('Leaflet map render failed:', err);
+        renderRouteFallback(coords, items);
+      }
+    }
+
+    function buildRouteStopList(items){
+      return items.map((item,idx)=>`
+        <div id="route-chip-${idx}" class="route-chip">
+          <span class="route-chip-num">${idx+1}</span>
+          <div class="min-w-0">
+            <p class="truncate font-black text-slate-900">${escapeHtml(item.time)}｜${escapeHtml(item.name)}</p>
+            <p class="truncate text-[10px] font-bold text-slate-500">${escapeHtml(item.addr)}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderRouteFallback(coords, items){
+      const el = document.getElementById('route-map');
+      const minLat = Math.min(...coords.map(c=>c[0]));
+      const maxLat = Math.max(...coords.map(c=>c[0]));
+      const minLng = Math.min(...coords.map(c=>c[1]));
+      const maxLng = Math.max(...coords.map(c=>c[1]));
+      const pad = 12;
+      const rawPoints = coords.map(([lat,lng])=>{
+        const x = pad + ((lng - minLng) / Math.max(maxLng-minLng, 0.0001)) * (100 - pad*2);
+        const y = pad + ((maxLat - lat) / Math.max(maxLat-minLat, 0.0001)) * (100 - pad*2);
+        return {x, y};
+      });
+
+      // 若同一天有多個行程在同一地點，例如碼頭先換票再搭船，稍微錯開點位，避免數字完全重疊。
+      const countByKey = {};
+      rawPoints.forEach(p => {
+        const key = `${Math.round(p.x*10)}_${Math.round(p.y*10)}`;
+        countByKey[key] = (countByKey[key] || 0) + 1;
+      });
+      const seenByKey = {};
+      const points = rawPoints.map(p => {
+        const key = `${Math.round(p.x*10)}_${Math.round(p.y*10)}`;
+        const total = countByKey[key];
+        const seen = seenByKey[key] || 0;
+        seenByKey[key] = seen + 1;
+        if(total <= 1) return p;
+        const angle = (Math.PI * 2 * seen / total) - Math.PI / 2;
+        const r = 4.2;
+        return {
+          x: Math.min(94, Math.max(6, p.x + Math.cos(angle) * r)),
+          y: Math.min(94, Math.max(6, p.y + Math.sin(angle) * r))
+        };
+      });
+
+      const poly = points.map(p=>`${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+      const markers = points.map((p,idx)=>`
+        <button type="button" class="fallback-marker-dot" style="left:${p.x}%; top:${p.y}%;" aria-label="第 ${idx+1} 站 ${escapeHtml(items[idx].name)}" onclick="highlightRouteStop(${idx})">${idx+1}</button>
+      `).join('');
+      const stopChips = items.map((item,idx)=>`
+        <div id="route-chip-${idx}" class="route-chip">
+          <span class="route-chip-num">${idx+1}</span>
+          <div class="min-w-0">
+            <p class="truncate font-black text-slate-900">${escapeHtml(item.time)}｜${escapeHtml(item.name)}</p>
+            <p class="truncate text-[10px] font-bold text-slate-500">${escapeHtml(item.addr)}</p>
+          </div>
+        </div>
+      `).join('');
+
+      el.innerHTML = `<div class="route-fallback" role="img" aria-label="當日行程範圍示意圖">
+        <div class="route-compass">N</div>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <polyline points="${poly}" fill="none" stroke="#7c3aed" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" opacity=".18" />
+          <polyline points="${poly}" fill="none" stroke="#7c3aed" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" opacity=".95" />
+        </svg>
+        ${markers}
+        <div class="route-map-caption">
+          <p class="font-black text-slate-900">本機行程範圍圖</p>
+          <p class="mt-0.5">外部實景地圖無法載入時，會改用這張備援圖；正式導航請按下方 Google Maps。</p>
+        </div>
+      </div>`;
+      document.getElementById('route-list').innerHTML = stopChips;
+    }
+
+    function highlightRouteStop(idx){
+      document.querySelectorAll('.route-chip').forEach(el => el.classList.remove('route-chip-active'));
+      const chip = document.getElementById(`route-chip-${idx}`);
+      if(chip){
+        chip.classList.add('route-chip-active');
+        chip.scrollIntoView({behavior:'smooth', block:'nearest'});
+      }
+    }
+
+    function closeRouteMap(){
+      const modal=document.getElementById('route-map-modal');
+      modal.classList.add('hidden'); modal.classList.remove('flex');
+      document.body.style.overflow='';
+    }
+
+    function bindUiHelpers(){
+      document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+        backdrop.addEventListener('click', (e) => {
+          if(e.target === backdrop){
+            backdrop.classList.add('hidden');
+            backdrop.classList.remove('flex');
+            if(backdrop.id === 'modal') closeModal();
+            if(backdrop.id === 'weather-detail-modal') closeWeatherDetail();
+            if(backdrop.id === 'route-map-modal') closeRouteMap();
+          }
+        });
+      });
+      document.addEventListener('keydown', (e) => {
+        if(e.key === 'Escape'){
+          closeModal();
+          closeWeatherDetail();
+          closePdfPreview();
+          closeRouteMap();
+        }
+      });
+    }
+
     function showToast(msg){
       const el=document.getElementById('toast'); el.textContent=msg; el.classList.remove('opacity-0'); el.classList.add('opacity-100');
       clearTimeout(window.__toastTimer); window.__toastTimer=setTimeout(()=>{el.classList.add('opacity-0'); el.classList.remove('opacity-100');},2600);
